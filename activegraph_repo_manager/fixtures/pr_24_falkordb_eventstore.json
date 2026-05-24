@@ -1,1 +1,27 @@
-{}
+{
+  "pull_request": {
+    "external_key": "gh:pr:yoheinakajima/activegraph#24",
+    "source": "github_fixture",
+    "external_metadata": {
+      "repository_external_key": "gh:repo:yoheinakajima/activegraph",
+      "html_url": "https://github.com/yoheinakajima/activegraph/pull/24",
+      "head_sha": "a1b2c3d4e5f60123456789abcdef0123456789ab"
+    },
+    "number": 24,
+    "title": "Persist FalkorDB event store checkpoints",
+    "status": "open",
+    "base_branch": "main",
+    "head_branch": "feat/falkordb-eventstore"
+  },
+  "check_run": {
+    "external_key": "gh:check:yoheinakajima/activegraph#24:github-actions:ci/audit:a1b2c3d4e5f60123456789abcdef0123456789ab",
+    "source": "github_fixture",
+    "external_metadata": {
+      "pull_request_external_key": "gh:pr:yoheinakajima/activegraph#24",
+      "commit_external_key": "gh:commit:yoheinakajima/activegraph@a1b2c3d4e5f60123456789abcdef0123456789ab"
+    },
+    "name": "ci/audit",
+    "status": "closed",
+    "conclusion": "success"
+  }
+}

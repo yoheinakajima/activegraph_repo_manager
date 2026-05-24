@@ -1,1 +1,15 @@
-{}
+{
+  "issue": {
+    "external_key": "gh:issue:yoheinakajima/activegraph#23",
+    "source": "github_fixture",
+    "external_metadata": {
+      "repository_external_key": "gh:repo:yoheinakajima/activegraph",
+      "html_url": "https://github.com/yoheinakajima/activegraph/issues/23",
+      "labels": ["telemetry", "enhancement"]
+    },
+    "number": 23,
+    "title": "Add OpenTelemetry spans for ingest pipeline",
+    "status": "open",
+    "urgency": "normal"
+  }
+}

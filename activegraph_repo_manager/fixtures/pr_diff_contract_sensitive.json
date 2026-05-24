@@ -1,1 +1,17 @@
-{}
+{
+  "pr_diff": {
+    "external_key": "gh:prdiff:yoheinakajima/activegraph#24:a1b2c3d4e5f60123456789abcdef0123456789ab",
+    "source": "github_fixture",
+    "pull_request_external_key": "gh:pr:yoheinakajima/activegraph#24",
+    "files_changed": [
+      "activegraph_repo_manager/behaviors/ingest_github.py",
+      "activegraph_repo_manager/schemas.py"
+    ],
+    "additions": 42,
+    "deletions": 7,
+    "external_metadata": {
+      "commit_external_key": "gh:commit:yoheinakajima/activegraph@a1b2c3d4e5f60123456789abcdef0123456789ab",
+      "base_sha": "1111222233334444555566667777888899990000"
+    }
+  }
+}
