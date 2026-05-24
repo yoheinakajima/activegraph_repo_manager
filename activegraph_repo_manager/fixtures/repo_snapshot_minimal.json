@@ -1,1 +1,13 @@
-{}
+{
+  "repository": {
+    "external_key": "gh:repo:yoheinakajima/activegraph",
+    "source": "github_fixture",
+    "external_metadata": {
+      "node_id": "R_kgDOA1B2C3",
+      "html_url": "https://github.com/yoheinakajima/activegraph"
+    },
+    "owner": "yoheinakajima",
+    "name": "activegraph",
+    "default_branch": "main"
+  }
+}
