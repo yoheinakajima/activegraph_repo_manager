@@ -1,0 +1,50 @@
+# .codex/rules/repo-manager.rules
+
+prefix_rule(
+    pattern = ["gh", "pr", "view"],
+    decision = "prompt",
+    justification = "Viewing PRs may require network access and should be explicit.",
+    match = ["gh pr view 24 --json title,body,files"],
+)
+
+prefix_rule(
+    pattern = ["gh", "issue", "view"],
+    decision = "prompt",
+    justification = "Viewing issues may require network access and should be explicit.",
+    match = ["gh issue view 23 --json title,body,labels"],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "comment"],
+    decision = "prompt",
+    justification = "Posting PR comments is an external write and must be approved.",
+    match = ["gh pr comment 24 --body test"],
+)
+
+prefix_rule(
+    pattern = ["gh", "issue", "comment"],
+    decision = "prompt",
+    justification = "Posting issue comments is an external write and must be approved.",
+    match = ["gh issue comment 23 --body test"],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "merge"],
+    decision = "forbidden",
+    justification = "Do not merge PRs from Codex during repo-manager implementation.",
+    match = ["gh pr merge 24"],
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "Pushing branches is an external write and requires approval.",
+    match = ["git push origin feat/activegraph-repo-manager"],
+)
+
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "forbidden",
+    justification = "Use safer targeted cleanup commands and ask for explicit approval.",
+    match = ["rm -rf activegraph_repo_manager"],
+)

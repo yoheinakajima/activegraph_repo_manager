@@ -1,0 +1,8 @@
+approval_policy = "on-request"
+default_permissions = ":workspace"
+project_doc_max_bytes = 65536
+
+project_doc_fallback_filenames = ["AGENT.md", ".agents.md"]
+
+[features]
+multi_agent = true
