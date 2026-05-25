@@ -16,9 +16,14 @@ class WorkType(str, Enum):
     docs = "docs"
     refactor = "refactor"
     infra = "infra"
+    observability = "observability"
+    store_backend = "store_backend"
 
 
 class Scope(str, Enum):
+    S = "S"
+    M = "M"
+    L = "L"
     repository = "repository"
     module = "module"
     file = "file"
@@ -32,6 +37,7 @@ class Risk(str, Enum):
 
 
 class PlanningPriority(str, Enum):
+    should_have = "should_have"
     low = "low"
     medium = "medium"
     high = "high"
