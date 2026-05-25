@@ -216,11 +216,25 @@ class PlanningPatchProposal(StrictModel):
     proposed_by_behavior: str
 
 
+class ExternalActionType(str, Enum):
+    github_comment = "github_comment"
+    github_label = "github_label"
+    github_request_changes = "github_request_changes"
+    github_approve_pr = "github_approve_pr"
+    github_open_issue = "github_open_issue"
+    open_roadmap_update_pr = "open_roadmap_update_pr"
+    open_contract_update_pr = "open_contract_update_pr"
+
+
 class ExternalActionProposal(StrictModel):
     proposal_id: str
     status: ProposalStatus = ProposalStatus.proposed
-    action_type: str
+    action_type: ExternalActionType
+    target_external_key: str
     payload: dict[str, Any] = Field(default_factory=dict)
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    rationale: str
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class MaintainerDigest(StrictModel):
