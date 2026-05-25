@@ -35,3 +35,21 @@ def mark_planning_patch_proposal_applied(proposal: dict) -> dict:
     updated = dict(proposal)
     updated["status"] = "applied"
     return updated
+
+
+def approve_external_action_proposal(proposal: dict) -> dict:
+    updated = dict(proposal)
+    updated["status"] = "approved"
+    return updated
+
+
+def reject_external_action_proposal(proposal: dict) -> dict:
+    updated = dict(proposal)
+    updated["status"] = "rejected"
+    return updated
+
+
+def mark_external_action_proposal_applied(proposal: dict) -> dict:
+    updated = dict(proposal)
+    updated["status"] = "applied"
+    return updated
