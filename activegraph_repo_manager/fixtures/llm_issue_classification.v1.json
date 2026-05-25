@@ -1,1 +1,13 @@
-{}
+{
+  "work_type": "observability",
+  "scope": "M",
+  "risk": "medium",
+  "planning_priority": "should_have",
+  "triage_urgency": "normal",
+  "lifecycle_status": "open",
+  "affected_areas": ["observability", "metrics", "operator_surface"],
+  "needs_maintainer_input": true,
+  "classification_confidence": 0.88,
+  "classification_prompt_version": "classify_issue.v1",
+  "classification_input_hash": ""
+}

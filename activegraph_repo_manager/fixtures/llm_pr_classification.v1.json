@@ -1,0 +1,13 @@
+{
+  "work_type": "store_backend",
+  "scope": "L",
+  "risk": "high",
+  "planning_priority": "should_have",
+  "triage_urgency": "normal",
+  "lifecycle_status": "open",
+  "affected_areas": ["store", "event_log", "operator_surface"],
+  "needs_maintainer_input": true,
+  "classification_confidence": 0.86,
+  "classification_prompt_version": "classify_pr.v1",
+  "classification_input_hash": ""
+}
