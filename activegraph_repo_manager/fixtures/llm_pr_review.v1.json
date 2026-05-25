@@ -1,1 +1,28 @@
-{}
+{
+  "review_prompt_version": "review_pr.v1",
+  "findings": [
+    {
+      "pr_external_key": "",
+      "severity": "warning",
+      "category": "store",
+      "blocking": false,
+      "title": "Store backend changes require replay safety coverage",
+      "detail": "EventStore-related changes were detected in contract-sensitive paths and should include deterministic replay validation in fixtures and tests.",
+      "suggested_fix": "Add or update replay-focused offline fixtures and tests that exercise event log persistence and replay compatibility.",
+      "evidence_refs": [
+        {
+          "source": "pr_diff",
+          "locator": "activegraph/store/event_store.py",
+          "note": "store backend surface"
+        },
+        {
+          "source": "pr_diff",
+          "locator": "docs/concepts/replay.md",
+          "note": "replay contract doc"
+        }
+      ],
+      "confidence": 0.92,
+      "requires_external_action": false
+    }
+  ]
+}
