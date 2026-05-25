@@ -78,6 +78,19 @@ class ProposalStatus(str, Enum):
     applied = "applied"
 
 
+class PlanningChangeType(str, Enum):
+    new_item = "new_item"
+    status = "status"
+    priority = "priority"
+    scope = "scope"
+    risk = "risk"
+    split = "split"
+    merge = "merge"
+    defer = "defer"
+    close = "close"
+    acceptance_criteria = "acceptance_criteria"
+
+
 class EvidenceRef(StrictModel):
     source: str
     locator: str
@@ -181,11 +194,26 @@ class Decision(StrictModel):
     evidence: list[EvidenceRef] = Field(default_factory=list)
 
 
+class PlanningPatchTarget(StrictModel):
+    source: str
+    locator: str
+
+
 class PlanningPatchProposal(StrictModel):
     proposal_id: str
     status: ProposalStatus = ProposalStatus.proposed
-    planning_item_external_key: str
-    patch: dict[str, Any] = Field(default_factory=dict)
+    change_type: PlanningChangeType
+    field: str
+    target_external_key: str | None = None
+    target_slug: str | None = None
+    from_value: Any = None
+    to_value: Any = None
+    proposed_item: dict[str, Any] | None = None
+    evidence_refs: list[PlanningPatchTarget] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    rationale: str
+    caused_by_event_id: str
+    proposed_by_behavior: str
 
 
 class ExternalActionProposal(StrictModel):
