@@ -1,3 +1,4 @@
+from pathlib import Path
 from activegraph_repo_manager.behaviors.apply_approved_actions import execute_external_action_proposal_dry_run
 from activegraph_repo_manager.behaviors.propose_external_action import (
     proposal_from_planning_patch,
@@ -96,3 +97,34 @@ def test_planning_patch_contract_followup_optional_scenario() -> None:
     proposal = proposal_from_planning_patch(planning_patch)
     assert proposal is not None
     assert proposal["action_type"] == "open_contract_update_pr"
+
+
+
+def test_proposed_but_not_approved_proposal_does_not_execute() -> None:
+    proposal = proposal_from_review_finding(_finding("comment"))
+    assert proposal is not None
+    result = execute_external_action_proposal_dry_run(proposal)
+    assert result["executed"] is False
+    assert result["reason"] == "proposal_not_approved"
+    assert result["proposal_status"] == "proposed"
+
+
+def test_behavior_bodies_do_not_include_live_write_or_network_calls() -> None:
+    apply_src = Path("activegraph_repo_manager/behaviors/apply_approved_actions.py").read_text(encoding="utf-8").lower()
+    propose_src = Path("activegraph_repo_manager/behaviors/propose_external_action.py").read_text(encoding="utf-8").lower()
+    combined = apply_src + "\n" + propose_src
+    forbidden_tokens = [
+        "requests.",
+        "httpx.",
+        "urllib",
+        "socket",
+        "github.client",
+        "write_text(",
+        "open(",
+        "request_changes(",
+        "approve_pr(",
+        "create_issue(",
+        "create_pr(",
+    ]
+    for token in forbidden_tokens:
+        assert token not in combined

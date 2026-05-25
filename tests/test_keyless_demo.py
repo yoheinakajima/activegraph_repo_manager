@@ -56,3 +56,15 @@ def test_read_only_guarantee_counters_are_zero() -> None:
     assert guarantees["planning_item_mutations_count"] == 0
     assert guarantees["github_write_count"] == 0
     assert guarantees["live_llm_call_count"] == 0
+    assert guarantees["external_write_performed"] is False
+
+
+
+def test_optional_external_action_proposal_counters_are_available_without_writes() -> None:
+    summary = run_keyless_demo(include_external_action_proposals=True)
+    assert summary["external_action_proposals_count"] == 0
+    assert summary["dry_run_external_actions_count"] == 0
+    guarantees = summary["read_only_guarantees"]
+    assert guarantees["github_write_count"] == 0
+    assert guarantees["external_write_performed"] is False
+    assert guarantees["live_llm_call_count"] == 0

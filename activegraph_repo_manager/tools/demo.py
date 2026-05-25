@@ -34,7 +34,7 @@ def _load_fixture(name: str) -> dict[str, Any]:
     return json.loads((FIXTURE_ROOT / name).read_text(encoding="utf-8"))
 
 
-def run_keyless_demo() -> dict[str, Any]:
+def run_keyless_demo(include_external_action_proposals: bool = False) -> dict[str, Any]:
     """Run deterministic offline fixture integration across Phases 0-4."""
 
     repository = _load_fixture("repo_snapshot_minimal.json")["repository"]
@@ -120,7 +120,7 @@ def run_keyless_demo() -> dict[str, Any]:
 
     _ = planning_decider_fixture  # fixture loaded intentionally to verify keyless input surface.
 
-    return {
+    result = {
         "repository_external_key": repository["external_key"],
         "ingested_issue_count": sum(1 for key in store.records if key.startswith("gh:issue:")),
         "ingested_pr_count": sum(1 for key in store.records if key.startswith("gh:pr:")),
@@ -137,10 +137,18 @@ def run_keyless_demo() -> dict[str, Any]:
             "external_action_proposals_count": len(review["external_action_proposals"]),
             "planning_item_mutations_count": len(review["planning_item_mutations"]),
             "github_write_count": 0,
+            "external_write_performed": False,
             "live_llm_call_count": 0,
         },
         "fixture_counts": dict(Counter(["issue", "pr", "repo", "pr_diff"])),
     }
+
+    if include_external_action_proposals:
+        result["external_action_proposals_count"] = len(review["external_action_proposals"])
+        result["dry_run_external_actions_count"] = 0
+
+    return result
+
 
 
 tools = ()
