@@ -4,8 +4,10 @@
     "source": "github_fixture",
     "pull_request_external_key": "gh:pr:yoheinakajima/activegraph#24",
     "files_changed": [
-      "activegraph_repo_manager/behaviors/ingest_github.py",
-      "activegraph_repo_manager/schemas.py"
+      "activegraph/store/event_store.py",
+      "activegraph/events/log.py",
+      "docs/concepts/replay.md",
+      "tests/test_eventstore_replay.py"
     ],
     "additions": 42,
     "deletions": 7,

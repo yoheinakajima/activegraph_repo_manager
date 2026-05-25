@@ -1,3 +1,8 @@
-# Placeholder
+# review_pr.v1
 
-Phase 0 placeholder prompt. Not implemented.
+Replay-only PR review prompt contract.
+
+- Emit structured `ReviewFinding` records only.
+- Every finding must include concrete `evidence_refs`.
+- Keep outputs schema-valid for required fields and enum-like values.
+- Do not perform or request external writes/actions.
