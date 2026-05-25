@@ -1,1 +1,46 @@
-{}
+{
+  "scenario_a": {
+    "proposal_id": "planning_patch::status::event_pr-merged_gh_pr_activegraph_activegraph_42",
+    "status": "proposed",
+    "change_type": "status",
+    "field": "status",
+    "target_external_key": "planning:item:ingest-idempotency",
+    "target_slug": null,
+    "from_value": "in_progress",
+    "to_value": "implemented",
+    "proposed_item": null,
+    "evidence_refs": [
+      {"source": "pr", "locator": "gh:pr:activegraph/activegraph#42"},
+      {"source": "planning_item", "locator": "planning:item:ingest-idempotency"},
+      {"source": "check", "locator": "gh:check:activegraph/activegraph#42:ci"}
+    ],
+    "confidence": 0.95,
+    "rationale": "Merged PR advances the planning item and no blocking findings are present.",
+    "caused_by_event_id": "event:pr-merged:gh:pr:activegraph/activegraph#42",
+    "proposed_by_behavior": "propose_planning_patch"
+  },
+  "scenario_b": {
+    "proposal_id": "planning_patch::new_item::event_issue-triage_gh_issue_activegraph_activegraph_23",
+    "status": "proposed",
+    "change_type": "new_item",
+    "field": "planning_item",
+    "target_external_key": null,
+    "target_slug": "candidate:issue-23",
+    "from_value": null,
+    "to_value": "proposed_new_item",
+    "proposed_item": {
+      "external_key": "planning:auto:issue:23",
+      "title": "Close observability and adoption-surface instrumentation gap",
+      "priority": "high",
+      "status": "open",
+      "work_type": "observability"
+    },
+    "evidence_refs": [
+      {"source": "issue", "locator": "gh:issue:activegraph/activegraph#23"}
+    ],
+    "confidence": 0.9,
+    "rationale": "High-signal unmatched issue indicates backlog-worthy planning scope.",
+    "caused_by_event_id": "event:issue-triage:gh:issue:activegraph/activegraph#23",
+    "proposed_by_behavior": "propose_planning_patch"
+  }
+}
