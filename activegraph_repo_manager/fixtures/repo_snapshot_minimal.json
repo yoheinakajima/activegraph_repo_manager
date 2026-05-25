@@ -9,5 +9,17 @@
     "owner": "yoheinakajima",
     "name": "activegraph",
     "default_branch": "main"
+  },
+  "repo_snapshot": {
+    "repository_external_key": "gh:repo:yoheinakajima/activegraph",
+    "snapshot_id": "fixture-main-001",
+    "commit_sha": "a1b2c3d4e5f60123456789abcdef0123456789ab",
+    "files": [
+      {"path": "activegraph_repo_manager/tools/repo_index.py", "language": "python", "size_bytes": 3200},
+      {"path": "tests/test_repo_grasp.py", "language": "python", "size_bytes": 1200},
+      {"path": "docs/codex/project_brief.md", "language": "markdown", "size_bytes": 220},
+      {"path": ".github/workflows/ci.yml", "language": "yaml", "size_bytes": 540},
+      {"path": "pyproject.toml", "language": "toml", "size_bytes": 410}
+    ]
   }
 }
