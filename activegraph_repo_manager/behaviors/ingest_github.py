@@ -112,3 +112,89 @@ def ingest_check_run(store: InMemoryExternalStore, payload: dict[str, Any]) -> I
         payload=dict(payload),
         object_type="CheckRun",
     )
+
+
+def normalize_github_repository(payload: dict[str, Any]) -> dict[str, Any]:
+    owner = payload["owner"]["login"]
+    name = payload["name"]
+    return {
+        "external_key": f"gh:repo:{owner}/{name}",
+        "source": "github",
+        "owner": owner,
+        "name": name,
+        "default_branch": payload["default_branch"],
+        "external_metadata": {
+            "private": bool(payload.get("private", False)),
+            "html_url": payload.get("html_url"),
+        },
+    }
+
+
+def normalize_github_issue(payload: dict[str, Any], *, owner: str, repo: str) -> dict[str, Any]:
+    return {
+        "external_key": f"gh:issue:{owner}/{repo}#{payload['number']}",
+        "source": "github",
+        "number": payload["number"],
+        "title": payload["title"],
+        "status": payload["state"],
+        "external_metadata": {
+            "html_url": payload.get("html_url"),
+            "labels": [label.get("name") for label in payload.get("labels", [])],
+        },
+    }
+
+
+def normalize_github_pull_request(payload: dict[str, Any], *, owner: str, repo: str) -> dict[str, Any]:
+    return {
+        "external_key": f"gh:pr:{owner}/{repo}#{payload['number']}",
+        "source": "github",
+        "number": payload["number"],
+        "title": payload["title"],
+        "status": payload["state"],
+        "base_branch": payload["base"]["ref"],
+        "head_branch": payload["head"]["ref"],
+        "external_metadata": {
+            "head_sha": payload["head"]["sha"],
+            "html_url": payload.get("html_url"),
+        },
+    }
+
+
+def normalize_github_pr_files(
+    payload: list[dict[str, Any]], *, owner: str, repo: str, pr_number: int, head_sha: str
+) -> dict[str, Any]:
+    return {
+        "external_key": f"gh:prdiff:{owner}/{repo}#{pr_number}:{head_sha}",
+        "source": "github",
+        "pull_request_external_key": f"gh:pr:{owner}/{repo}#{pr_number}",
+        "external_metadata": {
+            "commit_external_key": f"gh:commit:{owner}/{repo}@{head_sha}",
+            "files": [
+                {
+                    "filename": f.get("filename"),
+                    "status": f.get("status"),
+                    "additions": int(f.get("additions", 0)),
+                    "deletions": int(f.get("deletions", 0)),
+                }
+                for f in payload
+            ],
+        },
+    }
+
+
+def normalize_github_check_run(
+    payload: dict[str, Any], *, owner: str, repo: str, pr_number: int, head_sha: str
+) -> dict[str, Any]:
+    provider = payload.get("app", {}).get("slug", "unknown")
+    name = payload["name"]
+    return {
+        "external_key": f"gh:check:{owner}/{repo}#{pr_number}:{provider}:{name}:{head_sha}",
+        "source": "github",
+        "name": name,
+        "status": payload["status"],
+        "conclusion": payload.get("conclusion"),
+        "external_metadata": {
+            "provider": provider,
+            "head_sha": head_sha,
+        },
+    }

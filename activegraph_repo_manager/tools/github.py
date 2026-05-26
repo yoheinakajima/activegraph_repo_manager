@@ -1,8 +1,58 @@
-"""Deterministic, disabled-by-default GitHub/file external-write stubs."""
+"""Deterministic GitHub tool boundaries: read-only via injected clients, writes disabled."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
+
+
+class GitHubReadClient(Protocol):
+    def get_repository(self, owner: str, repo: str) -> dict[str, Any]: ...
+
+    def list_open_issues(self, owner: str, repo: str) -> list[dict[str, Any]]: ...
+
+    def get_issue(self, owner: str, repo: str, issue_number: int) -> dict[str, Any]: ...
+
+    def list_open_pull_requests(self, owner: str, repo: str) -> list[dict[str, Any]]: ...
+
+    def get_pull_request(self, owner: str, repo: str, pr_number: int) -> dict[str, Any]: ...
+
+    def get_pull_request_files(self, owner: str, repo: str, pr_number: int) -> list[dict[str, Any]]: ...
+
+    def get_pull_request_checks(self, owner: str, repo: str, pr_number: int) -> list[dict[str, Any]]: ...
+
+
+def github_get_repository(*, client: GitHubReadClient, owner: str, repo: str) -> dict[str, Any]:
+    return client.get_repository(owner, repo)
+
+
+def github_list_open_issues(*, client: GitHubReadClient, owner: str, repo: str) -> list[dict[str, Any]]:
+    return client.list_open_issues(owner, repo)
+
+
+def github_get_issue(*, client: GitHubReadClient, owner: str, repo: str, issue_number: int) -> dict[str, Any]:
+    return client.get_issue(owner, repo, issue_number)
+
+
+def github_list_open_pull_requests(
+    *, client: GitHubReadClient, owner: str, repo: str
+) -> list[dict[str, Any]]:
+    return client.list_open_pull_requests(owner, repo)
+
+
+def github_get_pull_request(*, client: GitHubReadClient, owner: str, repo: str, pr_number: int) -> dict[str, Any]:
+    return client.get_pull_request(owner, repo, pr_number)
+
+
+def github_get_pull_request_files(
+    *, client: GitHubReadClient, owner: str, repo: str, pr_number: int
+) -> list[dict[str, Any]]:
+    return client.get_pull_request_files(owner, repo, pr_number)
+
+
+def github_get_pull_request_checks(
+    *, client: GitHubReadClient, owner: str, repo: str, pr_number: int
+) -> list[dict[str, Any]]:
+    return client.get_pull_request_checks(owner, repo, pr_number)
 
 
 def _disabled_result(action_name: str, target_external_key: str, payload: dict[str, Any]) -> dict[str, Any]:
