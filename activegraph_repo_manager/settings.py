@@ -14,6 +14,10 @@ class RepoManagerSettings(BaseModel):
     enable_pr_review: bool = False
     enable_planning_proposals: bool = False
     enable_external_writes: bool = False
+    enable_github_write_tools: bool = False
+    enable_file_write_tools: bool = False
+    require_approval_for_external_actions: bool = True
+    dry_run_external_actions: bool = True
 
     classify_issue_prompt: str = "classify_issue.v1"
     classify_pr_prompt: str = "classify_pr.v1"
