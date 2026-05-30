@@ -25,6 +25,7 @@ from activegraph_repo_manager.behaviors.propose_planning_patch import (
     propose_new_item_for_high_signal_issue,
 )
 from activegraph_repo_manager.behaviors.review_pr import review_pr_from_recorded_output
+from activegraph_repo_manager.tools.github import sync_github_readonly
 from activegraph_repo_manager.tools.repo_index import infer_test_surfaces, parse_python_symbols
 
 FIXTURE_ROOT = Path(__file__).resolve().parent.parent / "fixtures"
@@ -34,8 +35,15 @@ def _load_fixture(name: str) -> dict[str, Any]:
     return json.loads((FIXTURE_ROOT / name).read_text(encoding="utf-8"))
 
 
-def run_keyless_demo(include_external_action_proposals: bool = False) -> dict[str, Any]:
-    """Run deterministic offline fixture integration across Phases 0-4."""
+def run_keyless_demo(
+    include_external_action_proposals: bool = False,
+    include_github_readonly_sync: bool = False,
+    github_client: Any | None = None,
+) -> dict[str, Any]:
+    """Run deterministic offline fixture integration across Phases 0-5a."""
+
+    if include_github_readonly_sync and github_client is None:
+        raise ValueError("include_github_readonly_sync requires an injected GitHub read client")
 
     repository = _load_fixture("repo_snapshot_minimal.json")["repository"]
     repo_snapshot = _load_fixture("repo_snapshot_minimal.json")["repo_snapshot"]
@@ -142,6 +150,14 @@ def run_keyless_demo(include_external_action_proposals: bool = False) -> dict[st
         },
         "fixture_counts": dict(Counter(["issue", "pr", "repo", "pr_diff"])),
     }
+
+    if include_github_readonly_sync:
+        result["github_readonly_sync"] = sync_github_readonly(
+            client=github_client,
+            owner="yoheinakajima",
+            repo="activegraph",
+            store=store,
+        )
 
     if include_external_action_proposals:
         result["external_action_proposals_count"] = len(review["external_action_proposals"])
