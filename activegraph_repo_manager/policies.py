@@ -7,7 +7,7 @@ from typing import Any
 ALLOWED_EXTERNAL_ACTION_TYPES = frozenset(
     {
         "github_comment",
-        "github_apply_label",
+        "github_label",
         "github_request_changes",
         "github_approve_pr",
         "github_open_issue",

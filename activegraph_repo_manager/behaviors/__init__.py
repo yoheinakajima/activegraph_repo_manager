@@ -11,6 +11,7 @@ behaviors = (
     "activegraph_repo_manager.behaviors.contract_guard",
     "activegraph_repo_manager.behaviors.review_pr",
     "activegraph_repo_manager.behaviors.propose_planning_patch",
+    "activegraph_repo_manager.behaviors.propose_external_action",
     "activegraph_repo_manager.behaviors.apply_approved_actions",
     "activegraph_repo_manager.behaviors.digest",
 )

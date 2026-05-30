@@ -5,4 +5,5 @@ tools = (
     "activegraph_repo_manager.tools.git",
     "activegraph_repo_manager.tools.repo_index",
     "activegraph_repo_manager.tools.test_runner",
+    "activegraph_repo_manager.tools.demo",
 )
