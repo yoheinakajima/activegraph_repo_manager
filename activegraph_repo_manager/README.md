@@ -7,7 +7,9 @@ repository state, replay classifications, link work to planning context, and
 produce structured proposals without taking public external action.
 
 It is read-only by default. Proposal objects are approval-gated, and external
-actions are dry-run-only. This is not full runtime ActiveGraph orchestration;
+actions are dry-run-only. For a concise current-status summary, safe-to-run
+commands, and before-live-read/write gates, see [`STATUS.md`](STATUS.md).
+This is not full runtime ActiveGraph orchestration;
 the current code does not provide a background loop, dashboard, digest delivery,
 automatic `PlanningItem` mutation, live GitHub write execution, or required live
 LLM calls.
