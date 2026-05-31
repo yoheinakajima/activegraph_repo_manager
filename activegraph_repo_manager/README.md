@@ -59,6 +59,36 @@ Write-like outcomes must remain represented as proposal objects until a future
 live-write PR adds explicit implementation, approval checks, denied/rejected
 execution tests, and operator-controlled settings.
 
+
+## Local state, query, and CLI command surface
+
+The repo-governance pack now includes a keyless local command surface backed by
+SQLite state. It remains offline and read-only with respect to GitHub, LLMs, and
+external files: the CLI seeds local state only from bundled fixtures and answers
+questions only from that tracked local state.
+
+Seed a local demo database with:
+
+```bash
+python -m activegraph_repo_manager keyless-demo --state .repo-manager/state.sqlite
+python -m activegraph_repo_manager demo
+```
+
+Ask deterministic questions from the local state with:
+
+```bash
+python -m activegraph_repo_manager.cli ask --state .repo-manager/state.sqlite "what PRs need review?"
+python -m activegraph_repo_manager ask "what issues are open?"
+python -m activegraph_repo_manager ask "summarize PR 24"
+python -m activegraph_repo_manager status --state .repo-manager/state.sqlite
+```
+
+Use `--state PATH` to choose a SQLite file. Supported state objects include
+repositories, issues, pull requests, repo files, symbols, test surfaces, review
+findings, planning patch proposals, external action proposals, check runs, PR
+diffs, and planning items. The query layer reports `source: local_state` and
+`live_llm_call_count: 0` for supported questions.
+
 ## Keyless demo
 
 Run the keyless demo tests with:

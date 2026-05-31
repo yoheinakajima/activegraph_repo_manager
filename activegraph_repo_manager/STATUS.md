@@ -100,6 +100,20 @@ The current safety boundary is covered by targeted pytest checks:
 - `pytest tests/test_pack_integration_audit.py` audits import hygiene, settings
   defaults, prompt and fixture consistency, and safety boundary conventions.
 
+
+## Local command surface status
+
+Implemented for keyless/demo use:
+
+- SQLite-backed local state in `activegraph_repo_manager.state`.
+- Deterministic local-state questions in `activegraph_repo_manager.query`.
+- Offline CLI entry point via `python -m activegraph_repo_manager`.
+- `keyless-demo`/`demo`, `ask`, `status`, and `snapshot` commands.
+
+Current boundaries remain unchanged: the command surface does not create live
+GitHub clients, does not perform live LLM calls, and does not execute external
+writes.
+
 ## Safe to run today
 
 The following existing pytest commands are safe to run today and do not require
