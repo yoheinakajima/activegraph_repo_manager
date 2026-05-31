@@ -23,14 +23,17 @@ The current implementation provides deterministic helper-level workflows for:
 - a local CLI `sync` command that constructs a live GET-only GitHub read client
   only from explicit `--token-env` or `--token` configuration and persists
   normalized read-side state into SQLite;
+- a GitHub Actions workflow for scheduled/manual read-only sync, Actions job
+  summaries, uploaded monitoring artifacts, and an optional static dashboard
+  artifact;
 - dry-run-only external action execution that reports structured results without
   public side effects;
 - live-write boundary stubs that return disabled or not-implemented outcomes
   instead of performing writes.
 
 These capabilities are helper-level building blocks. They are not a background
-service, dashboard, digest runner, autonomous maintainer, or end-to-end runtime
-ActiveGraph approval executor.
+service, hosted dashboard, digest runner, autonomous maintainer, or end-to-end
+runtime ActiveGraph approval executor.
 
 ## Fixture and fake-client based behavior
 
@@ -82,7 +85,7 @@ yet provide:
 - live LLM execution as a required path;
 - runtime ActiveGraph approval execution;
 - automatic `PlanningItem` mutation;
-- dashboard or digest runtime behavior;
+- hosted dashboard or digest runtime behavior;
 - background service orchestration;
 - runtime file writes from repo-manager behavior;
 - token persistence;
@@ -118,7 +121,8 @@ Implemented for keyless/demo and explicit live read-only sync use:
 - SQLite-backed local state in `activegraph_repo_manager.state`.
 - Deterministic local-state questions in `activegraph_repo_manager.query`.
 - CLI entry point via `python -m activegraph_repo_manager`.
-- `keyless-demo`/`demo`, `sync`, `ask`, `status`, and `snapshot` commands.
+- `keyless-demo`/`demo`, `sync`, `ask`, `status`, `report`, and `snapshot`
+  commands.
 
 Run live read-only sync with explicit token configuration:
 
@@ -141,6 +145,26 @@ state.
 Current boundaries remain unchanged for writes and LLMs: the command surface
 does not perform live LLM calls and does not execute external writes. The live
 GitHub path is read-only GET-only and exposes no POST/PATCH/PUT/DELETE helpers.
+
+## GitHub Actions monitoring status
+
+`.github/workflows/repo-manager.yml` provides scheduled and manual read-only
+monitoring. Configure a GitHub Actions secret named
+`REPO_MANAGER_GITHUB_TOKEN` with read-only repository access. Maintainers may run
+the workflow manually from the Actions tab with `workflow_dispatch`; it also runs
+every 30 minutes on the `*/30 * * * *` schedule.
+
+Monitoring output is available in the GitHub Actions job summary and the uploaded
+`repo-manager-monitoring` artifact. The artifact contains `state.sqlite`,
+`status.json`, `report.md`, and optional `dashboard/index.html`. GitHub Pages
+deployment is intentionally not implemented; the dashboard is only an uploaded
+artifact in this phase.
+
+The workflow keeps sync permissions read-only (`contents`, `issues`,
+`pull-requests`, and `checks`), checks out with persisted credentials disabled,
+and does not grant issue, PR, or contents write permissions. The report generator
+redacts token-like values and reports safety flags for read-only sync, no GitHub
+writes, no live LLM calls, and no token persistence.
 
 ## Safe to run today
 
@@ -193,7 +217,7 @@ Do not claim that the repo manager currently provides:
 - live LLM execution as a required path;
 - runtime ActiveGraph approval execution;
 - automatic `PlanningItem` mutation;
-- dashboard or digest runtime behavior;
+- hosted dashboard or digest runtime behavior;
 - background service orchestration.
 
 ## Recommended next PRs

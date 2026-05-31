@@ -10,9 +10,9 @@ It is read-only by default. Proposal objects are approval-gated, and external
 actions are dry-run-only. For a concise current-status summary, safe-to-run
 commands, and before-live-read/write gates, see [`STATUS.md`](STATUS.md).
 This is not full runtime ActiveGraph orchestration;
-the current code does not provide a background loop, dashboard, digest delivery,
-automatic `PlanningItem` mutation, live GitHub write execution, or required live
-LLM calls.
+the current code does not provide a background loop, hosted dashboard service,
+digest delivery, automatic `PlanningItem` mutation, live GitHub write execution,
+or required live LLM calls.
 
 ## Current capabilities
 
@@ -38,6 +38,9 @@ The current helper-level implementation covers these safe, auditable workflows:
 - **GitHub read-only sync** through an injected read client, fake client, or
   explicit-token local CLI path. Tests remain fixture/fake-client based and do
   not require credentials.
+- **GitHub Actions monitoring** for scheduled/manual read-only sync, Actions job
+  summaries, uploaded monitoring artifacts, and an optional static dashboard
+  artifact.
 - **Keyless demo integration** that exercises the safe helper-level path without
   GitHub credentials or live LLM calls.
 - **Pack integration audit** checks for import hygiene, settings defaults,
@@ -52,7 +55,8 @@ The repo-governance pack intentionally does **not** currently do the following:
 - require live LLM calls for the existing replay/demo/test paths;
 - execute runtime file writes from repo-manager behavior;
 - run background maintainer loops;
-- provide dashboard or digest behavior as a verified runtime feature;
+- provide a hosted dashboard service or digest behavior as a verified runtime
+  feature;
 - automatically mutate `PlanningItem` records;
 - execute runtime ActiveGraph approval flows end-to-end.
 
@@ -125,6 +129,29 @@ Safety boundaries for this path are explicit: GitHub REST access is GET-only; no
 comments, labels, reviews, issue creation, PR creation, POST/PATCH/PUT/DELETE,
 external writes, background loop, dashboard/digest runtime, direct
 `PlanningItem` mutation, or live LLM calls are implemented.
+
+## GitHub Actions read-only monitoring
+
+The repository includes `.github/workflows/repo-manager.yml` for GitHub-native
+monitoring. Configure a repository or organization secret named
+`REPO_MANAGER_GITHUB_TOKEN` with read-only access to the target repository. The
+workflow passes that secret only as the `REPO_MANAGER_GITHUB_TOKEN` environment
+variable and invokes `sync` with `--token-env REPO_MANAGER_GITHUB_TOKEN`; it does
+not print the token, persist checkout credentials, or use the token for writes.
+
+Maintainers can run the workflow manually from the GitHub Actions tab with
+`workflow_dispatch`, optionally overriding the owner/repo inputs. It also runs on
+a `*/30 * * * *` schedule. The sync job grants read-only permissions
+(`contents`, `issues`, `pull-requests`, and `checks`) and does not grant issue,
+PR, or contents write permissions.
+
+Monitor results in the GitHub Actions run summary and the uploaded
+`repo-manager-monitoring` artifact. The artifact contains `state.sqlite`,
+`status.json`, `report.md`, and, when generated, `dashboard/index.html`. The
+static dashboard is an uploaded artifact only; GitHub Pages deployment is not
+implemented in this PR. Generated reports redact token-like values and summarize
+the safety status: read-only sync, no GitHub writes, no live LLM calls, and no
+token persistence.
 
 ## Keyless demo
 

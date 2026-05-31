@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from activegraph_repo_manager.demo_state import seed_keyless_demo_state
+from activegraph_repo_manager.monitoring import write_monitoring_artifacts
 from activegraph_repo_manager.query import answer_question
 from activegraph_repo_manager.state import DEFAULT_STATE_PATH, LocalStateIngestAdapter, LocalStateStore
 from activegraph_repo_manager.tools.github import github_readonly_client_from_token, sync_github_readonly
@@ -60,6 +61,15 @@ def build_parser() -> argparse.ArgumentParser:
     token_group.add_argument("--token-env", help="Name of the environment variable containing the GitHub token.")
     token_group.add_argument("--token", help="Explicit GitHub token value. The token is never printed or persisted.")
 
+    report_parser = subparsers.add_parser("report", help="Generate monitoring artifacts from local state.")
+    add_state_argument(report_parser)
+    report_parser.add_argument("--out", required=True, help="Directory for status.json and report.md artifacts.")
+    report_parser.add_argument(
+        "--dashboard",
+        action="store_true",
+        help="Also generate dashboard/index.html under the output directory.",
+    )
+
     snapshot_parser = subparsers.add_parser("snapshot", help="Print a deterministic local-state snapshot.")
     add_state_argument(snapshot_parser)
     return parser
@@ -90,6 +100,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 store=LocalStateIngestAdapter(store),
             )
             result = _persist_sync_summary(store, sync_summary, owner=args.owner, repo=args.repo)
+        elif args.command == "report":
+            result = write_monitoring_artifacts(store, args.out, include_dashboard=args.dashboard)
         elif args.command == "snapshot":
             result = store.deterministic_snapshot()
         else:
