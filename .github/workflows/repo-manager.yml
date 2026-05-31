@@ -1,0 +1,84 @@
+name: Repo manager read-only monitoring
+
+on:
+  workflow_dispatch:
+    inputs:
+      owner:
+        description: GitHub repository owner to sync
+        required: false
+        default: yoheinakajima
+      repo:
+        description: GitHub repository name to sync
+        required: false
+        default: activegraph
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  checks: read
+
+jobs:
+  readonly-sync:
+    name: Read-only sync and monitoring
+    runs-on: ubuntu-latest
+    env:
+      REPO_MANAGER_GITHUB_TOKEN: ${{ secrets.REPO_MANAGER_GITHUB_TOKEN }}
+      REPO_MANAGER_OWNER: ${{ github.event.inputs.owner || 'yoheinakajima' }}
+      REPO_MANAGER_REPO: ${{ github.event.inputs.repo || 'activegraph' }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal Python requirements
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pydantic pytest
+
+      - name: Run read-only GitHub sync
+        run: |
+          set -euo pipefail
+          if [ -z "${REPO_MANAGER_GITHUB_TOKEN}" ]; then
+            echo "REPO_MANAGER_GITHUB_TOKEN secret is required for read-only sync." >&2
+            exit 1
+          fi
+          mkdir -p .repo-manager
+          python -m activegraph_repo_manager sync \
+            --state .repo-manager/state.sqlite \
+            --owner "${REPO_MANAGER_OWNER}" \
+            --repo "${REPO_MANAGER_REPO}" \
+            --token-env REPO_MANAGER_GITHUB_TOKEN
+
+      - name: Generate monitoring artifacts
+        run: |
+          set -euo pipefail
+          python -m activegraph_repo_manager report \
+            --state .repo-manager/state.sqlite \
+            --out .repo-manager/report \
+            --dashboard
+
+      - name: Write job summary
+        run: |
+          set -euo pipefail
+          cat .repo-manager/report/report.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload monitoring artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-manager-monitoring
+          path: |
+            .repo-manager/state.sqlite
+            .repo-manager/report/status.json
+            .repo-manager/report/report.md
+            .repo-manager/report/dashboard/index.html
+          if-no-files-found: error
