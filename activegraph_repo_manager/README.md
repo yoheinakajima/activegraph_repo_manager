@@ -35,8 +35,9 @@ The current helper-level implementation covers these safe, auditable workflows:
   keeps `no_external_write` true.
 - **Live-write boundary stubs** that deliberately return disabled or
   not-implemented outcomes instead of performing writes.
-- **GitHub read-only sync** through an injected read client or fake client.
-  Tests remain fixture/fake-client based and do not require credentials.
+- **GitHub read-only sync** through an injected read client, fake client, or
+  explicit-token local CLI path. Tests remain fixture/fake-client based and do
+  not require credentials.
 - **Keyless demo integration** that exercises the safe helper-level path without
   GitHub credentials or live LLM calls.
 - **Pack integration audit** checks for import hygiene, settings defaults,
@@ -62,10 +63,11 @@ execution tests, and operator-controlled settings.
 
 ## Local state, query, and CLI command surface
 
-The repo-governance pack now includes a keyless local command surface backed by
-SQLite state. It remains offline and read-only with respect to GitHub, LLMs, and
-external files: the CLI seeds local state only from bundled fixtures and answers
-questions only from that tracked local state.
+The repo-governance pack now includes a local command surface backed by SQLite
+state. The keyless demo path remains offline and uses bundled fixtures. The
+`sync` command is an explicit-token, live read-only GitHub REST path that mirrors
+read-side GitHub data into the chosen local state file; it does not perform
+GitHub writes, external file writes, or live LLM calls.
 
 Seed a local demo database with:
 
@@ -88,6 +90,41 @@ repositories, issues, pull requests, repo files, symbols, test surfaces, review
 findings, planning patch proposals, external action proposals, check runs, PR
 diffs, and planning items. The query layer reports `source: local_state` and
 `live_llm_call_count: 0` for supported questions.
+
+## Live read-only GitHub sync CLI
+
+Run live read-only sync only with explicit token configuration:
+
+```bash
+python -m activegraph_repo_manager sync \
+  --state .repo-manager/state.sqlite \
+  --owner yoheinakajima \
+  --repo activegraph \
+  --token-env GITHUB_TOKEN
+```
+
+For local operator workflows, `--token <token>` is also supported. Prefer
+`--token-env` in shells so the token is not captured in command history. The CLI
+reads only the named environment variable when `--token-env` is provided. The
+live client factory requires the token to be passed explicitly and does not read
+environment variables. Tokens are not printed and are not persisted in SQLite.
+
+The sync command persists normalized repository metadata, open issues, open pull
+requests, PR file summaries, check runs, and a sync/status summary into the
+selected local SQLite state. After sync, ask deterministic questions from that
+same state file:
+
+```bash
+python -m activegraph_repo_manager status --state .repo-manager/state.sqlite
+python -m activegraph_repo_manager ask --state .repo-manager/state.sqlite "what issues are open?"
+python -m activegraph_repo_manager ask --state .repo-manager/state.sqlite "what PRs are open?"
+python -m activegraph_repo_manager ask --state .repo-manager/state.sqlite "what PRs need review?"
+```
+
+Safety boundaries for this path are explicit: GitHub REST access is GET-only; no
+comments, labels, reviews, issue creation, PR creation, POST/PATCH/PUT/DELETE,
+external writes, background loop, dashboard/digest runtime, direct
+`PlanningItem` mutation, or live LLM calls are implemented.
 
 ## Keyless demo
 
@@ -124,8 +161,9 @@ fixture path.
 
 The test suite uses fake clients. Those fakes expose read methods and fail if a
 write method is invoked. Sync summaries include read-side counts and keep write
-counters at zero. There is no default live GitHub client and no required token or
-credential read in the tested path.
+counters at zero. The live CLI path exists only behind explicit `--token-env` or
+`--token` operator configuration; tests do not use real tokens or make network
+calls.
 
 ## ExternalActionProposal dry-run behavior
 
@@ -199,6 +237,7 @@ pytest tests/test_external_action_policy.py
 pytest tests/test_live_write_boundary.py
 pytest tests/test_github_readonly_sync.py
 pytest tests/test_github_readonly_orchestrator.py
+pytest tests/test_live_readonly_github_cli.py
 pytest tests/test_pack_integration_audit.py
 pytest tests/test_repo_manager_docs.py
 ```

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Sequence
 
 from activegraph_repo_manager.demo_state import seed_keyless_demo_state
 from activegraph_repo_manager.query import answer_question
-from activegraph_repo_manager.state import DEFAULT_STATE_PATH, LocalStateStore
+from activegraph_repo_manager.state import DEFAULT_STATE_PATH, LocalStateIngestAdapter, LocalStateStore
+from activegraph_repo_manager.tools.github import github_readonly_client_from_token, sync_github_readonly
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -50,6 +52,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     status_parser = subparsers.add_parser("status", help="Show current repo-manager status from local state.")
     add_state_argument(status_parser)
+    sync_parser = subparsers.add_parser("sync", help="Sync live GitHub read-only state into local SQLite.")
+    add_state_argument(sync_parser)
+    sync_parser.add_argument("--owner", required=True, help="GitHub repository owner to read.")
+    sync_parser.add_argument("--repo", required=True, help="GitHub repository name to read.")
+    token_group = sync_parser.add_mutually_exclusive_group()
+    token_group.add_argument("--token-env", help="Name of the environment variable containing the GitHub token.")
+    token_group.add_argument("--token", help="Explicit GitHub token value. The token is never printed or persisted.")
+
     snapshot_parser = subparsers.add_parser("snapshot", help="Print a deterministic local-state snapshot.")
     add_state_argument(snapshot_parser)
     return parser
@@ -70,12 +80,71 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = answer_question(" ".join(args.question), store)
         elif args.command == "status":
             result = answer_question("what is the current repo manager status?", store)
+        elif args.command == "sync":
+            token = _resolve_sync_token(args, parser)
+            client = github_readonly_client_from_token(token)
+            sync_summary = sync_github_readonly(
+                client=client,
+                owner=args.owner,
+                repo=args.repo,
+                store=LocalStateIngestAdapter(store),
+            )
+            result = _persist_sync_summary(store, sync_summary, owner=args.owner, repo=args.repo)
         elif args.command == "snapshot":
             result = store.deterministic_snapshot()
         else:
             parser.error(f"unknown command: {args.command}")
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
+
+
+def _resolve_sync_token(args: argparse.Namespace, parser: argparse.ArgumentParser) -> str:
+    if args.token_env:
+        token = os.environ.get(args.token_env)
+        if not token:
+            parser.error(f"sync requires environment variable {args.token_env} to be set")
+        return token
+    if args.token:
+        return args.token
+    parser.error("sync requires --token-env NAME or --token TOKEN")
+    raise AssertionError("parser.error exits")
+
+
+def _persist_sync_summary(
+    store: LocalStateStore, sync_summary: dict[str, int | str], *, owner: str, repo: str
+) -> dict[str, object]:
+    stored_summary = {
+        "mode": "live_github_readonly_sync",
+        "source": "github_readonly_rest",
+        "owner": owner,
+        "repo": repo,
+        "read_only": True,
+        "external_write_performed": False,
+        **sync_summary,
+        "object_counts": store.object_counts(),
+    }
+    store.upsert_summary("github_readonly_sync", stored_summary)
+    store.upsert_summary(
+        "repo_manager_status",
+        {
+            "mode": "live_github_readonly_sync",
+            "source": "local_state",
+            "repository_external_key": sync_summary["repository_external_key"],
+            "read_only": True,
+            "external_write_performed": False,
+            "github_write_count": sync_summary["github_write_count"],
+            "live_llm_call_count": sync_summary["live_llm_call_count"],
+            "object_counts": store.object_counts(),
+        },
+    )
+    return {
+        "sync_complete": True,
+        "source": "github_readonly_rest",
+        "read_only": True,
+        "external_write_performed": False,
+        **sync_summary,
+        "object_counts": store.object_counts(),
+    }
 
 
 if __name__ == "__main__":

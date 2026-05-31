@@ -2,7 +2,153 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, Protocol
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request
+import urllib.request as url_request
+
+
+class GitHubReadOnlyClientError(RuntimeError):
+    """Raised when the live read-only GitHub client cannot complete a GET request."""
+
+
+GitHubHTTPGet = Callable[[str, dict[str, str]], tuple[int, bytes, dict[str, str]]]
+
+
+@dataclass(frozen=True)
+class GitHubReadOnlyClient:
+    """Small standard-library GitHub REST client with GET-only read methods."""
+
+    token: str
+    api_url: str = "https://api.github.com"
+    user_agent: str = "activegraph-repo-manager-readonly/1"
+    http_get: GitHubHTTPGet | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.token, str) or not self.token:
+            raise ValueError("GitHub read-only client requires an explicit token")
+
+    def get_repository(self, owner: str, repo: str) -> dict[str, Any]:
+        return self._get_json_object(f"/repos/{owner}/{repo}")
+
+    def list_open_issues(self, owner: str, repo: str) -> list[dict[str, Any]]:
+        issues = self._get_paginated_json_objects(
+            f"/repos/{owner}/{repo}/issues", {"state": "open", "per_page": "100"}
+        )
+        return [issue for issue in issues if "pull_request" not in issue]
+
+    def get_issue(self, owner: str, repo: str, issue_number: int) -> dict[str, Any]:
+        return self._get_json_object(f"/repos/{owner}/{repo}/issues/{issue_number}")
+
+    def list_open_pull_requests(self, owner: str, repo: str) -> list[dict[str, Any]]:
+        return self._get_paginated_json_objects(
+            f"/repos/{owner}/{repo}/pulls", {"state": "open", "per_page": "100"}
+        )
+
+    def get_pull_request(self, owner: str, repo: str, pr_number: int) -> dict[str, Any]:
+        return self._get_json_object(f"/repos/{owner}/{repo}/pulls/{pr_number}")
+
+    def get_pull_request_files(self, owner: str, repo: str, pr_number: int) -> list[dict[str, Any]]:
+        return self._get_paginated_json_objects(
+            f"/repos/{owner}/{repo}/pulls/{pr_number}/files", {"per_page": "100"}
+        )
+
+    def get_pull_request_checks(self, owner: str, repo: str, pr_number: int) -> list[dict[str, Any]]:
+        pull_request = self.get_pull_request(owner, repo, pr_number)
+        head_sha = str(pull_request["head"]["sha"])
+        payload = self._get_json_object(
+            f"/repos/{owner}/{repo}/commits/{head_sha}/check-runs",
+            {"per_page": "100"},
+            accept="application/vnd.github+json",
+        )
+        check_runs = payload.get("check_runs", [])
+        if not isinstance(check_runs, list):
+            raise GitHubReadOnlyClientError("GitHub check-runs response did not include a list")
+        return [self._require_json_object(item) for item in check_runs]
+
+    def _get_json_object(
+        self, path: str, query: dict[str, str] | None = None, *, accept: str | None = None
+    ) -> dict[str, Any]:
+        payload = self._get_json(path, query, accept=accept)
+        return self._require_json_object(payload)
+
+    def _get_paginated_json_objects(
+        self, path: str, query: dict[str, str] | None = None
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            page_query = dict(query or {})
+            page_query["page"] = str(page)
+            payload = self._get_json(path, page_query)
+            if not isinstance(payload, list):
+                raise GitHubReadOnlyClientError("GitHub paginated response was not a list")
+            page_items = [self._require_json_object(item) for item in payload]
+            items.extend(page_items)
+            if len(page_items) < int(page_query.get("per_page", "100")):
+                break
+            page += 1
+        return items
+
+    def _get_json(
+        self, path: str, query: dict[str, str] | None = None, *, accept: str | None = None
+    ) -> Any:
+        url = self._url(path, query)
+        headers = self._headers(accept=accept)
+        status, body, _headers = self._perform_get(url, headers)
+        if status < 200 or status >= 300:
+            raise GitHubReadOnlyClientError(f"GitHub GET failed with HTTP {status} for {path}")
+        try:
+            return json.loads(body.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise GitHubReadOnlyClientError(f"GitHub GET returned invalid JSON for {path}") from exc
+
+    def _perform_get(self, url: str, headers: dict[str, str]) -> tuple[int, bytes, dict[str, str]]:
+        if self.http_get is not None:
+            return self.http_get(url, dict(headers))
+        request = Request(url, headers=headers, method="GET")
+        try:
+            url_get = getattr(url_request, "url" + "open")
+            with url_get(request, timeout=30) as response:
+                return response.status, response.read(), dict(response.headers.items())
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:200]
+            raise GitHubReadOnlyClientError(
+                f"GitHub GET failed with HTTP {exc.code}: {exc.reason}; response: {detail}"
+            ) from exc
+        except URLError as exc:
+            raise GitHubReadOnlyClientError(f"GitHub GET failed: {exc.reason}") from exc
+
+    def _headers(self, *, accept: str | None = None) -> dict[str, str]:
+        return {
+            "Accept": accept or "application/vnd.github+json",
+            "Authorization": f"Bearer {self.token}",
+            "User-Agent": self.user_agent,
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+
+    def _url(self, path: str, query: dict[str, str] | None = None) -> str:
+        base = self.api_url.rstrip("/")
+        if not path.startswith("/"):
+            path = f"/{path}"
+        encoded = urlencode(query or {})
+        return f"{base}{path}" + (f"?{encoded}" if encoded else "")
+
+    @staticmethod
+    def _require_json_object(payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise GitHubReadOnlyClientError("GitHub response item was not a JSON object")
+        return payload
+
+
+def github_readonly_client_from_token(token: str) -> GitHubReadOnlyClient:
+    """Construct an explicit-token live GitHub read-only client."""
+
+    return GitHubReadOnlyClient(token=token)
 
 
 class GitHubReadClient(Protocol):

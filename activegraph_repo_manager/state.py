@@ -27,6 +27,49 @@ SUPPORTED_OBJECT_TYPE_SET = frozenset(SUPPORTED_OBJECT_TYPES)
 DEFAULT_STATE_PATH = Path(".activegraph_repo_manager") / "state.sqlite3"
 
 
+GITHUB_EXTERNAL_KEY_OBJECT_TYPES = (
+    ("gh:prdiff:", "pr_diff"),
+    ("gh:check:", "check_run"),
+    ("gh:repo:", "repository"),
+    ("gh:issue:", "issue"),
+    ("gh:pr:", "pull_request"),
+)
+
+
+def github_object_type_from_external_key(external_key: str) -> str:
+    for prefix, object_type in GITHUB_EXTERNAL_KEY_OBJECT_TYPES:
+        if external_key.startswith(prefix):
+            return object_type
+    raise ValueError(f"Unsupported GitHub external_key for local state ingest: {external_key}")
+
+
+class LocalStateIngestAdapter:
+    """Adapter that lets idempotent ingest helpers persist into LocalStateStore."""
+
+    def __init__(self, store: "LocalStateStore") -> None:
+        self.store = store
+
+    def find_by_external_key(self, external_key: str) -> dict[str, Any] | None:
+        return self.store.get_object(github_object_type_from_external_key(external_key), external_key)
+
+    def create(self, payload: dict[str, Any]) -> dict[str, Any]:
+        external_key = _external_key_from_payload(payload)
+        object_type = github_object_type_from_external_key(external_key)
+        return self.store.upsert_object(object_type, dict(payload))
+
+    def patch(self, external_key: str, payload: dict[str, Any]) -> dict[str, Any]:
+        object_type = github_object_type_from_external_key(external_key)
+        existing = self.store.get_object(object_type, external_key) or {}
+        return self.store.upsert_object(object_type, {**existing, **dict(payload)})
+
+
+def _external_key_from_payload(payload: dict[str, Any]) -> str:
+    external_key = payload.get("external_key")
+    if not isinstance(external_key, str) or not external_key:
+        raise ValueError("payload must include a non-empty external_key")
+    return external_key
+
+
 def _canonical_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
