@@ -10,9 +10,9 @@ It is read-only by default. Proposal objects are approval-gated, and external
 actions are dry-run-only. For a concise current-status summary, safe-to-run
 commands, and before-live-read/write gates, see [`STATUS.md`](STATUS.md).
 This is not full runtime ActiveGraph orchestration;
-the current code does not provide a background loop, dashboard, digest delivery,
-automatic `PlanningItem` mutation, live GitHub write execution, or required live
-LLM calls.
+the current code does not provide an autonomous maintainer loop, dashboard,
+digest delivery, automatic `PlanningItem` mutation, live GitHub write execution,
+or required live LLM calls.
 
 ## Current capabilities
 
@@ -51,7 +51,7 @@ The repo-governance pack intentionally does **not** currently do the following:
 - post comments, labels, reviews, issues, or pull requests to GitHub;
 - require live LLM calls for the existing replay/demo/test paths;
 - execute runtime file writes from repo-manager behavior;
-- run background maintainer loops;
+- run autonomous maintainer loops;
 - provide dashboard or digest behavior as a verified runtime feature;
 - automatically mutate `PlanningItem` records;
 - execute runtime ActiveGraph approval flows end-to-end.
@@ -65,9 +65,10 @@ execution tests, and operator-controlled settings.
 
 The repo-governance pack now includes a local command surface backed by SQLite
 state. The keyless demo path remains offline and uses bundled fixtures. The
-`sync` command is an explicit-token, live read-only GitHub REST path that mirrors
-read-side GitHub data into the chosen local state file; it does not perform
-GitHub writes, external file writes, or live LLM calls.
+`sync` command is an explicit-token, one-shot live read-only GitHub REST path;
+the `run` command repeats the same read-only sync on an operator-selected
+interval. Both mirror read-side GitHub data into the chosen local state file;
+they do not perform GitHub writes, external file writes, or live LLM calls.
 
 Seed a local demo database with:
 
@@ -91,9 +92,9 @@ findings, planning patch proposals, external action proposals, check runs, PR
 diffs, and planning items. The query layer reports `source: local_state` and
 `live_llm_call_count: 0` for supported questions.
 
-## Live read-only GitHub sync CLI
+## Live read-only GitHub sync and run CLI
 
-Run live read-only sync only with explicit token configuration:
+Run a one-shot live read-only sync only with explicit token configuration:
 
 ```bash
 python -m activegraph_repo_manager sync \
@@ -103,16 +104,33 @@ python -m activegraph_repo_manager sync \
   --token-env GITHUB_TOKEN
 ```
 
+Run the same read-only sync periodically with an explicit interval:
+
+```bash
+python -m activegraph_repo_manager run \
+  --state .repo-manager/state.sqlite \
+  --owner yoheinakajima \
+  --repo activegraph \
+  --token-env GITHUB_TOKEN \
+  --interval 300
+```
+
+Use `--once` for exactly one read-only sync iteration, or
+`--max-iterations N` for a bounded operator run. The default run interval is 300
+seconds. Looping intervals must be at least 30 seconds; shorter intervals are
+accepted only with `--once` because no sleep loop occurs.
+
 For local operator workflows, `--token <token>` is also supported. Prefer
 `--token-env` in shells so the token is not captured in command history. The CLI
 reads only the named environment variable when `--token-env` is provided. The
 live client factory requires the token to be passed explicitly and does not read
 environment variables. Tokens are not printed and are not persisted in SQLite.
 
-The sync command persists normalized repository metadata, open issues, open pull
-requests, PR file summaries, check runs, and a sync/status summary into the
-selected local SQLite state. After sync, ask deterministic questions from that
-same state file:
+The sync and run commands persist normalized repository metadata, open issues,
+open pull requests, PR file summaries, check runs, and sync/status summaries into
+the selected local SQLite state. The run command also persists the latest
+read-only run-loop summary and emits one JSON object per completed iteration.
+After sync or run, ask deterministic questions from that same state file:
 
 ```bash
 python -m activegraph_repo_manager status --state .repo-manager/state.sqlite
@@ -123,8 +141,8 @@ python -m activegraph_repo_manager ask --state .repo-manager/state.sqlite "what 
 
 Safety boundaries for this path are explicit: GitHub REST access is GET-only; no
 comments, labels, reviews, issue creation, PR creation, POST/PATCH/PUT/DELETE,
-external writes, background loop, dashboard/digest runtime, direct
-`PlanningItem` mutation, or live LLM calls are implemented.
+external writes, autonomous maintainer behavior, dashboard/digest runtime,
+direct `PlanningItem` mutation, or live LLM calls are implemented.
 
 ## Keyless demo
 

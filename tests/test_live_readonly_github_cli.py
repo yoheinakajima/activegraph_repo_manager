@@ -213,6 +213,213 @@ def test_sync_persists_github_state_status_and_ask_answers_without_token_persist
     assert pr_answer["items"][0]["number"] == 24
 
 
+def _run_args(state_path: Path, *extra_args: str) -> list[str]:
+    return [
+        "run",
+        "--state",
+        str(state_path),
+        "--owner",
+        OWNER,
+        "--repo",
+        REPO,
+        *extra_args,
+    ]
+
+
+def _json_lines(output: str) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in output.splitlines()]
+
+
+def test_run_max_iterations_public_flag_syncs_exactly_n_times_without_writes_or_llm_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    state_path = tmp_path / ".repo-manager" / "state.sqlite"
+    calls = _install_fake_client_factory(monkeypatch)
+    sleep_calls: list[int] = []
+    monkeypatch.setattr(cli_module.time, "sleep", sleep_calls.append)
+
+    assert cli_main(_run_args(state_path, "--token", TOKEN, "--interval", "30", "--max-iterations", "2")) == 0
+    captured = capsys.readouterr()
+    payloads = _json_lines(captured.out)
+
+    assert sleep_calls == [30]
+    assert calls["tokens"] == [TOKEN]
+    assert len(calls["clients"]) == 1
+    assert calls["clients"][0].write_calls == []
+    assert [payload["iteration"] for payload in payloads] == [1, 2]
+    assert all(payload["run_iteration_complete"] is True for payload in payloads)
+    assert all(payload["mode"] == "live_github_readonly_run_loop" for payload in payloads)
+    assert all(payload["read_only"] is True for payload in payloads)
+    assert all(payload["external_write_performed"] is False for payload in payloads)
+    assert all(payload["github_write_count"] == 0 for payload in payloads)
+    assert all(payload["live_llm_call_count"] == 0 for payload in payloads)
+    assert payloads[0]["last_sync"]["issues_created"] == 1
+    assert payloads[1]["last_sync"]["issues_created"] == 0
+    assert payloads[1]["last_sync"]["issues_updated_or_patched"] == 1
+    assert TOKEN not in captured.out
+    assert TOKEN not in captured.err
+
+    with LocalStateStore(state_path) as store:
+        run_summary = store.get_summary("github_readonly_run")
+        assert run_summary["iteration"] == 2
+        assert run_summary["interval_seconds"] == 30
+        assert run_summary["github_write_count"] == 0
+        assert run_summary["live_llm_call_count"] == 0
+        status_summary = store.get_summary("repo_manager_status")
+        assert status_summary["github_write_count"] == 0
+        assert status_summary["live_llm_call_count"] == 0
+        assert store.count_objects_by_type("issue") == 1
+        assert store.count_objects_by_type("pull_request") == 1
+
+    assert TOKEN.encode() not in state_path.read_bytes()
+
+
+def test_run_once_allows_short_interval_exits_after_one_sync_and_preserves_local_queries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    state_path = tmp_path / ".repo-manager" / "state.sqlite"
+    calls = _install_fake_client_factory(monkeypatch)
+    sleep_calls: list[int] = []
+    monkeypatch.setattr(cli_module.time, "sleep", sleep_calls.append)
+
+    assert cli_main(_run_args(state_path, "--token", TOKEN, "--interval", "1", "--once")) == 0
+    captured = capsys.readouterr()
+    payloads = _json_lines(captured.out)
+
+    assert sleep_calls == []
+    assert calls["clients"][0].write_calls == []
+    assert len(payloads) == 1
+    assert payloads[0]["iteration"] == 1
+    assert payloads[0]["interval_seconds"] == 1
+    assert payloads[0]["read_only"] is True
+    assert payloads[0]["external_write_performed"] is False
+    assert payloads[0]["github_write_count"] == 0
+    assert payloads[0]["live_llm_call_count"] == 0
+    assert TOKEN not in captured.out
+    assert TOKEN not in captured.err
+
+    assert cli_main(["status", "--state", str(state_path)]) == 0
+    status_payload = json.loads(capsys.readouterr().out)
+    status_item = status_payload["items"][0]
+    assert status_item["object_counts"]["issue"] == 1
+    assert status_item["object_counts"]["pull_request"] == 1
+    assert status_item["github_write_count"] == 0
+    assert status_item["live_llm_call_count"] == 0
+
+    assert cli_main(["ask", "--state", str(state_path), "what issues are open?"]) == 0
+    issue_answer = json.loads(capsys.readouterr().out)
+    assert issue_answer["source"] == "local_state"
+    assert issue_answer["live_llm_call_count"] == 0
+    assert "Open issues" in issue_answer["answer"]
+    assert issue_answer["items"][0]["number"] == 23
+
+    assert cli_main(["ask", "--state", str(state_path), "what PRs are open?"]) == 0
+    pr_answer = json.loads(capsys.readouterr().out)
+    assert pr_answer["source"] == "local_state"
+    assert pr_answer["live_llm_call_count"] == 0
+    assert "Open pull requests" in pr_answer["answer"]
+    assert pr_answer["items"][0]["number"] == 24
+
+    assert cli_main(["ask", "--state", str(state_path), "what PRs need review?"]) == 0
+    review_answer = json.loads(capsys.readouterr().out)
+    assert review_answer["source"] == "local_state"
+    assert review_answer["live_llm_call_count"] == 0
+    assert "Open PRs that need review attention" in review_answer["answer"]
+    assert review_answer["items"] == []
+
+    with sqlite3.connect(state_path) as connection:
+        rows = connection.execute(
+            "SELECT payload_json FROM objects UNION ALL SELECT payload_json FROM summaries"
+        ).fetchall()
+    assert rows
+    assert all(TOKEN not in str(row[0]) for row in rows)
+    assert TOKEN.encode() not in state_path.read_bytes()
+
+
+def test_run_token_env_reads_only_named_env_var_and_does_not_print_or_persist_token(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    state_path = tmp_path / ".repo-manager" / "state.sqlite"
+    calls = _install_fake_client_factory(monkeypatch)
+    monkeypatch.setenv("GITHUB_TOKEN", "wrong-token")
+    monkeypatch.setenv("REPO_MANAGER_TEST_TOKEN", TOKEN)
+
+    assert cli_main(_run_args(state_path, "--token-env", "REPO_MANAGER_TEST_TOKEN", "--once")) == 0
+    captured = capsys.readouterr()
+    payload = _json_lines(captured.out)[0]
+
+    assert calls["tokens"] == [TOKEN]
+    assert payload["run_iteration_complete"] is True
+    assert payload["interval_seconds"] == 300
+    assert payload["github_write_count"] == 0
+    assert payload["live_llm_call_count"] == 0
+    assert TOKEN not in captured.out
+    assert TOKEN not in captured.err
+    assert b"wrong-token" not in state_path.read_bytes()
+    assert TOKEN.encode() not in state_path.read_bytes()
+
+
+def test_run_requires_explicit_token_configuration(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main(_run_args(tmp_path / "state.sqlite"))
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 2
+    assert "run requires --token-env NAME or --token TOKEN" in captured.err
+
+
+def test_run_rejects_interval_below_safe_floor_unless_once_is_used(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main(_run_args(tmp_path / "state.sqlite", "--token", TOKEN, "--interval", "29", "--max-iterations", "1"))
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 2
+    assert "run requires --interval to be at least 30 seconds unless --once is used" in captured.err
+
+
+def test_run_rejects_non_positive_interval(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        cli_main(_run_args(tmp_path / "state.sqlite", "--token", TOKEN, "--interval", "0", "--once"))
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 2
+    assert "interval must be a positive integer" in captured.err
+
+
+def test_cli_run_tests_do_not_need_network(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_network(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("network call attempted")
+
+    _install_fake_client_factory(monkeypatch)
+    monkeypatch.setattr(socket, "create_connection", fail_network)
+    monkeypatch.setattr(socket, "socket", fail_network)
+
+    assert cli_main(_run_args(tmp_path / "state.sqlite", "--token", TOKEN, "--once")) == 0
+    run_payload = _json_lines(capsys.readouterr().out)[0]
+    assert run_payload["run_iteration_complete"] is True
+    assert run_payload["github_write_count"] == 0
+    assert run_payload["live_llm_call_count"] == 0
+
+
 def test_readonly_client_exposes_no_write_methods() -> None:
     client = GitHubReadOnlyClient(token="fake-token", http_get=lambda _url, _headers: (200, b"{}", {}))
     forbidden = {
