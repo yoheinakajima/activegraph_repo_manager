@@ -196,5 +196,6 @@ def normalize_github_check_run(
         "external_metadata": {
             "provider": provider,
             "head_sha": head_sha,
+            "pull_request_external_key": f"gh:pr:{owner}/{repo}#{pr_number}",
         },
     }

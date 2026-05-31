@@ -3,8 +3,8 @@
 This document summarizes the current state of `activegraph_repo_manager`, a
 helper-level repo-governance pack for the ActiveGraph repository. It is intended
 for maintainers who need a concise view of what exists today, what is still only
-fixture or fake-client based, and what gates must pass before any live runtime
-reads or live writes are claimed.
+fixture or fake-client based, what explicit live read-only CLI path exists, and
+what gates must pass before any live writes are claimed.
 
 ## Current helper-level capabilities
 
@@ -20,6 +20,9 @@ The current implementation provides deterministic helper-level workflows for:
 - `PlanningPatchProposal` and `ExternalActionProposal` object generation;
 - GitHub read-only sync helpers that require an injected read client and are
   tested with fake clients;
+- a local CLI `sync` command that constructs a live GET-only GitHub read client
+  only from explicit `--token-env` or `--token` configuration and persists
+  normalized read-side state into SQLite;
 - dry-run-only external action execution that reports structured results without
   public side effects;
 - live-write boundary stubs that return disabled or not-implemented outcomes
@@ -34,8 +37,8 @@ ActiveGraph approval executor.
 The safe paths are intentionally fixture and fake-client based:
 
 - keyless demo coverage uses offline fixtures and recorded replay outputs;
-- GitHub read-only sync tests use injected fake clients rather than implicit
-  credentials or a default live GitHub client;
+- GitHub read-only sync tests use injected fake clients rather than real
+  credentials or network calls;
 - fake clients expose read methods and are expected to fail if write methods are
   invoked;
 - existing classification and review paths do not require live LLM calls;
@@ -50,7 +53,9 @@ Public side effects remain outside the implemented runtime boundary.
 
 Read-side behavior must continue to preserve these constraints:
 
-- no implicit credential reads;
+- no implicit credential reads; the live CLI sync path reads only the named
+  environment variable passed with `--token-env`, or the explicit `--token`
+  value;
 - no direct GitHub clients inside behavior bodies;
 - no direct network I/O inside behavior bodies;
 - no blind-create ingest for externally sourced objects;
@@ -80,6 +85,7 @@ yet provide:
 - dashboard or digest runtime behavior;
 - background service orchestration;
 - runtime file writes from repo-manager behavior;
+- token persistence;
 - broadened helper functionality beyond the documented helper-level paths.
 
 ## Tests proving the current safety boundary
@@ -92,6 +98,10 @@ The current safety boundary is covered by targeted pytest checks:
   works through injected fake clients and keeps write counts at zero.
 - `pytest tests/test_github_readonly_orchestrator.py` proves orchestration of
   the read-only sync path remains fake-client/injected-client based.
+- `pytest tests/test_live_readonly_github_cli.py` proves the local CLI live
+  read-only sync boundary requires explicit token configuration, does not print
+  or persist tokens, uses fake clients/transports in tests, persists read-side
+  state, and keeps write counters at zero.
 - `pytest tests/test_external_action_policy.py` proves external actions are
   proposal and dry-run oriented, with approval-state handling and no external
   write effects.
@@ -103,16 +113,34 @@ The current safety boundary is covered by targeted pytest checks:
 
 ## Local command surface status
 
-Implemented for keyless/demo use:
+Implemented for keyless/demo and explicit live read-only sync use:
 
 - SQLite-backed local state in `activegraph_repo_manager.state`.
 - Deterministic local-state questions in `activegraph_repo_manager.query`.
-- Offline CLI entry point via `python -m activegraph_repo_manager`.
-- `keyless-demo`/`demo`, `ask`, `status`, and `snapshot` commands.
+- CLI entry point via `python -m activegraph_repo_manager`.
+- `keyless-demo`/`demo`, `sync`, `ask`, `status`, and `snapshot` commands.
 
-Current boundaries remain unchanged: the command surface does not create live
-GitHub clients, does not perform live LLM calls, and does not execute external
-writes.
+Run live read-only sync with explicit token configuration:
+
+```bash
+python -m activegraph_repo_manager sync \
+  --state .repo-manager/state.sqlite \
+  --owner yoheinakajima \
+  --repo activegraph \
+  --token-env GITHUB_TOKEN
+```
+
+The CLI may also accept `--token <token>`, but `--token-env` is preferred for
+operator shells. The CLI reads only the named environment variable for
+`--token-env`; the live client/factory does not read environment variables. The
+token is not printed or persisted. Sync persists repository metadata, open
+issues, open pull requests, PR file summaries, check runs, and sync/status
+summaries. After sync, `status` and `ask` answer from the same local SQLite
+state.
+
+Current boundaries remain unchanged for writes and LLMs: the command surface
+does not perform live LLM calls and does not execute external writes. The live
+GitHub path is read-only GET-only and exposes no POST/PATCH/PUT/DELETE helpers.
 
 ## Safe to run today
 
@@ -123,24 +151,20 @@ network access, GitHub credentials, live LLM credentials, or live writes:
 pytest tests/test_keyless_demo.py
 pytest tests/test_github_readonly_sync.py
 pytest tests/test_github_readonly_orchestrator.py
+pytest tests/test_live_readonly_github_cli.py
 pytest tests/test_external_action_policy.py
 pytest tests/test_live_write_boundary.py
 pytest tests/test_pack_integration_audit.py
 ```
 
-## Before live read runtime wiring
+## Live read runtime wiring now present
 
-Before claiming live read runtime wiring, a future PR should add or confirm:
-
-1. explicit operator settings for any live read mode;
-2. injected live read client construction outside behavior bodies;
-3. credential handling that is opt-in, documented, and not used by default;
-4. tests that keep fixture and fake-client paths credential-free;
-5. tests for missing, malformed, and denied read configuration;
-6. audit summaries that distinguish fixture reads, fake-client reads, and live
-   reads;
-7. documentation that live read mode is read-only and cannot escalate into
-   writes.
+Live read runtime wiring is limited to the local CLI `sync` command. It is
+operator-triggered, explicit-token, GET-only, and persists only normalized
+read-side GitHub state into the selected SQLite file. Tests remain fake-client or
+fake-transport based and require no credentials or network access. This live read
+path cannot escalate into writes because no live write methods or non-GET HTTP
+helpers are exposed.
 
 ## Before-live-write gates
 
@@ -176,11 +200,9 @@ Do not claim that the repo manager currently provides:
 
 Recommended follow-up PRs, in order:
 
-1. live read runtime wiring with explicit settings and injected clients, while
-   preserving fake-client tests and read-only defaults;
-2. stronger audit documentation for distinguishing fixture, fake-client, and
-   future live-read runs;
-3. focused approval-runtime design notes for how proposal objects would be
+1. stronger audit documentation for distinguishing fixture, fake-client, and
+   live read-only CLI runs;
+2. focused approval-runtime design notes for how proposal objects would be
    approved and executed without adding writes yet;
-4. separate live-write implementation only after the before-live-write gates are
+3. separate live-write implementation only after the before-live-write gates are
    agreed, implemented, and tested.
