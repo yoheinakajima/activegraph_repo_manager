@@ -20,17 +20,18 @@ The current implementation provides deterministic helper-level workflows for:
 - `PlanningPatchProposal` and `ExternalActionProposal` object generation;
 - GitHub read-only sync helpers that require an injected read client and are
   tested with fake clients;
-- a local CLI `sync` command that constructs a live GET-only GitHub read client
-  only from explicit `--token-env` or `--token` configuration and persists
-  normalized read-side state into SQLite;
+- local CLI `sync` and `run` commands that construct a live GET-only GitHub
+  read client only from explicit `--token-env` or `--token` configuration and
+  persist normalized read-side state into SQLite;
 - dry-run-only external action execution that reports structured results without
   public side effects;
 - live-write boundary stubs that return disabled or not-implemented outcomes
   instead of performing writes.
 
-These capabilities are helper-level building blocks. They are not a background
-service, dashboard, digest runner, autonomous maintainer, or end-to-end runtime
-ActiveGraph approval executor.
+These capabilities are helper-level building blocks. The read-only `run` command
+periodically repeats sync for an operator, but it is not an autonomous
+maintainer, dashboard, digest runner, or end-to-end runtime ActiveGraph approval
+executor.
 
 ## Fixture and fake-client based behavior
 
@@ -53,9 +54,9 @@ Public side effects remain outside the implemented runtime boundary.
 
 Read-side behavior must continue to preserve these constraints:
 
-- no implicit credential reads; the live CLI sync path reads only the named
-  environment variable passed with `--token-env`, or the explicit `--token`
-  value;
+- no implicit credential reads; the live CLI sync and run paths read only the
+  named environment variable passed with `--token-env`, or the explicit
+  `--token` value;
 - no direct GitHub clients inside behavior bodies;
 - no direct network I/O inside behavior bodies;
 - no blind-create ingest for externally sourced objects;
@@ -83,7 +84,7 @@ yet provide:
 - runtime ActiveGraph approval execution;
 - automatic `PlanningItem` mutation;
 - dashboard or digest runtime behavior;
-- background service orchestration;
+- autonomous background service orchestration;
 - runtime file writes from repo-manager behavior;
 - token persistence;
 - broadened helper functionality beyond the documented helper-level paths.
@@ -99,9 +100,9 @@ The current safety boundary is covered by targeted pytest checks:
 - `pytest tests/test_github_readonly_orchestrator.py` proves orchestration of
   the read-only sync path remains fake-client/injected-client based.
 - `pytest tests/test_live_readonly_github_cli.py` proves the local CLI live
-  read-only sync boundary requires explicit token configuration, does not print
-  or persist tokens, uses fake clients/transports in tests, persists read-side
-  state, and keeps write counters at zero.
+  read-only sync and run boundaries require explicit token configuration, do not
+  print or persist tokens, use fake clients/transports in tests, persist
+  read-side state, and keep write counters at zero.
 - `pytest tests/test_external_action_policy.py` proves external actions are
   proposal and dry-run oriented, with approval-state handling and no external
   write effects.
@@ -113,14 +114,14 @@ The current safety boundary is covered by targeted pytest checks:
 
 ## Local command surface status
 
-Implemented for keyless/demo and explicit live read-only sync use:
+Implemented for keyless/demo and explicit live read-only sync/run use:
 
 - SQLite-backed local state in `activegraph_repo_manager.state`.
 - Deterministic local-state questions in `activegraph_repo_manager.query`.
 - CLI entry point via `python -m activegraph_repo_manager`.
-- `keyless-demo`/`demo`, `sync`, `ask`, `status`, and `snapshot` commands.
+- `keyless-demo`/`demo`, `sync`, `run`, `ask`, `status`, and `snapshot` commands.
 
-Run live read-only sync with explicit token configuration:
+Run one-shot live read-only sync with explicit token configuration:
 
 ```bash
 python -m activegraph_repo_manager sync \
@@ -130,13 +131,30 @@ python -m activegraph_repo_manager sync \
   --token-env GITHUB_TOKEN
 ```
 
+Run periodic live read-only sync with an explicit interval:
+
+```bash
+python -m activegraph_repo_manager run \
+  --state .repo-manager/state.sqlite \
+  --owner yoheinakajima \
+  --repo activegraph \
+  --token-env GITHUB_TOKEN \
+  --interval 300
+```
+
+Use `--once` for exactly one read-only sync iteration, or
+`--max-iterations N` for a bounded operator run. The default run interval is 300
+seconds, and looping intervals below 30 seconds fail clearly unless `--once` is
+used.
+
 The CLI may also accept `--token <token>`, but `--token-env` is preferred for
 operator shells. The CLI reads only the named environment variable for
 `--token-env`; the live client/factory does not read environment variables. The
-token is not printed or persisted. Sync persists repository metadata, open
+token is not printed or persisted. Sync/run persists repository metadata, open
 issues, open pull requests, PR file summaries, check runs, and sync/status
-summaries. After sync, `status` and `ask` answer from the same local SQLite
-state.
+summaries. The run command also persists a latest run-loop summary and emits one
+JSON object per completed iteration. After sync or run, `status` and `ask` answer
+from the same local SQLite state.
 
 Current boundaries remain unchanged for writes and LLMs: the command surface
 does not perform live LLM calls and does not execute external writes. The live
@@ -159,12 +177,12 @@ pytest tests/test_pack_integration_audit.py
 
 ## Live read runtime wiring now present
 
-Live read runtime wiring is limited to the local CLI `sync` command. It is
-operator-triggered, explicit-token, GET-only, and persists only normalized
-read-side GitHub state into the selected SQLite file. Tests remain fake-client or
-fake-transport based and require no credentials or network access. This live read
-path cannot escalate into writes because no live write methods or non-GET HTTP
-helpers are exposed.
+Live read runtime wiring is limited to the local CLI `sync` and `run` commands.
+They are operator-triggered, explicit-token, GET-only, and persist only
+normalized read-side GitHub state into the selected SQLite file. Tests remain
+fake-client or fake-transport based and require no credentials or network access.
+These live read paths cannot escalate into writes because no live write methods
+or non-GET HTTP helpers are exposed.
 
 ## Before-live-write gates
 
@@ -194,7 +212,7 @@ Do not claim that the repo manager currently provides:
 - runtime ActiveGraph approval execution;
 - automatic `PlanningItem` mutation;
 - dashboard or digest runtime behavior;
-- background service orchestration.
+- autonomous background service orchestration.
 
 ## Recommended next PRs
 
